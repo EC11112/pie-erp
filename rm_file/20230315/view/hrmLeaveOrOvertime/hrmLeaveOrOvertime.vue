@@ -1,0 +1,417 @@
+<template>
+  <div>
+    <div class="gva-search-box">
+      <el-form :inline="true" :model="searchInfo" class="demo-form-inline" @keyup.enter="onSubmit">
+      <el-form-item label="创建时间">
+      <el-date-picker v-model="searchInfo.startCreatedAt" type="datetime" placeholder="开始时间"></el-date-picker>
+       —
+      <el-date-picker v-model="searchInfo.endCreatedAt" type="datetime" placeholder="结束时间"></el-date-picker>
+      </el-form-item>
+        <el-form-item label="用户ID">
+            
+             <el-input v-model.number="searchInfo.user_id" placeholder="搜索条件" />
+
+        </el-form-item>
+            <el-form-item label="是否为请假" prop="is_leave">
+            <el-select v-model="searchInfo.is_leave" clearable placeholder="请选择">
+                <el-option
+                    key="true"
+                    label="是"
+                    value="true">
+                </el-option>
+                <el-option
+                    key="false"
+                    label="否"
+                    value="false">
+                </el-option>
+            </el-select>
+            </el-form-item>
+        <el-form-item label="起始日期">
+            
+            <el-date-picker v-model="searchInfo.startStart_date" type="datetime" placeholder="搜索条件（起）"></el-date-picker>
+            —
+            <el-date-picker v-model="searchInfo.endStart_date" type="datetime" placeholder="搜索条件（止）"></el-date-picker>
+
+        </el-form-item>
+        <el-form-item label="终止日期">
+            
+            <el-date-picker v-model="searchInfo.startEnd_date" type="datetime" placeholder="搜索条件（起）"></el-date-picker>
+            —
+            <el-date-picker v-model="searchInfo.endEnd_date" type="datetime" placeholder="搜索条件（止）"></el-date-picker>
+
+        </el-form-item>
+            <el-form-item label="是否批准" prop="is_approved">
+            <el-select v-model="searchInfo.is_approved" clearable placeholder="请选择">
+                <el-option
+                    key="true"
+                    label="是"
+                    value="true">
+                </el-option>
+                <el-option
+                    key="false"
+                    label="否"
+                    value="false">
+                </el-option>
+            </el-select>
+            </el-form-item>
+        <el-form-item label="说明">
+         <el-input v-model="searchInfo.explanation" placeholder="搜索条件" />
+
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" icon="search" @click="onSubmit">查询</el-button>
+          <el-button icon="refresh" @click="onReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+    <div class="gva-table-box">
+        <div class="gva-btn-list">
+            <el-button type="primary" icon="plus" @click="openDialog">新增</el-button>
+            <el-popover v-model:visible="deleteVisible" placement="top" width="160">
+            <p>确定要删除吗？</p>
+            <div style="text-align: right; margin-top: 8px;">
+                <el-button type="primary" link @click="deleteVisible = false">取消</el-button>
+                <el-button type="primary" @click="onDelete">确定</el-button>
+            </div>
+            <template #reference>
+                <el-button icon="delete" style="margin-left: 10px;" :disabled="!multipleSelection.length" @click="deleteVisible = true">删除</el-button>
+            </template>
+            </el-popover>
+        </div>
+        <el-table
+        ref="multipleTable"
+        style="width: 100%"
+        tooltip-effect="dark"
+        :data="tableData"
+        row-key="ID"
+        @selection-change="handleSelectionChange"
+        @sort-change="sortChange"
+        >
+        <el-table-column type="selection" width="55" />
+        <el-table-column align="left" label="日期" width="180">
+            <template #default="scope">{{ formatDate(scope.row.CreatedAt) }}</template>
+        </el-table-column>
+        <el-table-column sortable align="left" label="用户ID" prop="user_id" width="120" />
+        <el-table-column sortable align="left" label="是否为请假" prop="is_leave" width="120">
+            <template #default="scope">{{ formatBoolean(scope.row.is_leave) }}</template>
+        </el-table-column>
+         <el-table-column sortable align="left" label="起始日期" width="180">
+            <template #default="scope">{{ formatDate(scope.row.start_date) }}</template>
+         </el-table-column>
+         <el-table-column sortable align="left" label="终止日期" width="180">
+            <template #default="scope">{{ formatDate(scope.row.end_date) }}</template>
+         </el-table-column>
+        <el-table-column sortable align="left" label="是否批准" prop="is_approved" width="120">
+            <template #default="scope">{{ formatBoolean(scope.row.is_approved) }}</template>
+        </el-table-column>
+        <el-table-column sortable align="left" label="说明" prop="explanation" width="120" />
+        <el-table-column align="left" label="操作">
+            <template #default="scope">
+            <el-button type="primary" link icon="edit" class="table-button" @click="updateHrmLeaveOrOvertimeFunc(scope.row)">变更</el-button>
+            <el-button type="primary" link icon="delete" @click="deleteRow(scope.row)">删除</el-button>
+            </template>
+        </el-table-column>
+        </el-table>
+        <div class="gva-pagination">
+            <el-pagination
+            layout="total, sizes, prev, pager, next, jumper"
+            :current-page="page"
+            :page-size="pageSize"
+            :page-sizes="[10, 30, 50, 100]"
+            :total="total"
+            @current-change="handleCurrentChange"
+            @size-change="handleSizeChange"
+            />
+        </div>
+    </div>
+    <el-dialog v-model="dialogFormVisible" :before-close="closeDialog" title="弹窗操作">
+      <el-form :model="formData" label-position="right" ref="elFormRef" :rules="rule" label-width="100px">
+        <el-form-item label="用户ID:"  prop="user_id" >
+          <el-input v-model.number="formData.user_id" :clearable="false" placeholder="请输入" />
+        </el-form-item>
+        <el-form-item label="申请类型:"  prop="is_leave" >
+          <el-switch v-model="formData.is_leave" active-color="#13ce66" inactive-color="#ff4949" active-text="请假" inactive-text="加班" clearable ></el-switch>
+        </el-form-item>
+        <el-form-item label="起始日期:"  prop="start_date" >
+          <el-date-picker v-model="formData.start_date" type="date" style="width:100%" placeholder="选择日期" :clearable="false"  />
+        </el-form-item>
+        <el-form-item label="终止日期:"  prop="end_date" >
+          <el-date-picker v-model="formData.end_date" type="date" style="width:100%" placeholder="选择日期" :clearable="false"  />
+        </el-form-item>
+        <el-form-item label="是否批准:"  prop="is_approved" >
+          <el-switch v-model="formData.is_approved" active-color="#13ce66" inactive-color="#ff4949" active-text="是" inactive-text="否" clearable ></el-switch>
+        </el-form-item>
+        <el-form-item label="说明:"  prop="explanation" >
+          <el-input v-model="formData.explanation" :clearable="true"  placeholder="请输入" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeDialog">取 消</el-button>
+          <el-button type="primary" @click="enterDialog">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'HrmLeaveOrOvertime'
+}
+</script>
+
+<script setup>
+import {
+  createHrmLeaveOrOvertime,
+  deleteHrmLeaveOrOvertime,
+  deleteHrmLeaveOrOvertimeByIds,
+  updateHrmLeaveOrOvertime,
+  findHrmLeaveOrOvertime,
+  getHrmLeaveOrOvertimeList
+} from '@/api/hrmLeaveOrOvertime'
+
+// 全量引入格式化工具 请按需保留
+import { getDictFunc, formatDate, formatBoolean, filterDict } from '@/utils/format'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive } from 'vue'
+
+// 自动化生成的字典（可能为空）以及字段
+const formData = ref({
+        user_id: 0,
+        is_leave: false,
+        start_date: new Date(),
+        end_date: new Date(),
+        is_approved: false,
+        explanation: '',
+        })
+
+// 验证规则
+const rule = reactive({
+               user_id : [{
+                   required: true,
+                   message: '',
+                   trigger: ['input','blur'],
+               }],
+               is_leave : [{
+                   required: true,
+                   message: '',
+                   trigger: ['input','blur'],
+               }],
+               start_date : [{
+                   required: true,
+                   message: '',
+                   trigger: ['input','blur'],
+               }],
+               end_date : [{
+                   required: true,
+                   message: '',
+                   trigger: ['input','blur'],
+               }],
+               is_approved : [{
+                   required: true,
+                   message: '',
+                   trigger: ['input','blur'],
+               }],
+})
+
+const elFormRef = ref()
+
+
+// =========== 表格控制部分 ===========
+const page = ref(1)
+const total = ref(0)
+const pageSize = ref(10)
+const tableData = ref([])
+const searchInfo = ref({})
+// 排序
+const sortChange = ({ prop, order }) => {
+  searchInfo.value.sort = prop
+  searchInfo.value.order = order
+  getTableData()
+}
+
+// 重置
+const onReset = () => {
+  searchInfo.value = {}
+  getTableData()
+}
+
+// 搜索
+const onSubmit = () => {
+  page.value = 1
+  pageSize.value = 10
+  if (searchInfo.value.is_leave === ""){
+      searchInfo.value.is_leave=null
+  }
+  if (searchInfo.value.is_approved === ""){
+      searchInfo.value.is_approved=null
+  }
+  getTableData()
+}
+
+// 分页
+const handleSizeChange = (val) => {
+  pageSize.value = val
+  getTableData()
+}
+
+// 修改页面容量
+const handleCurrentChange = (val) => {
+  page.value = val
+  getTableData()
+}
+
+// 查询
+const getTableData = async() => {
+  const table = await getHrmLeaveOrOvertimeList({ page: page.value, pageSize: pageSize.value, ...searchInfo.value })
+  if (table.code === 0) {
+    tableData.value = table.data.list
+    total.value = table.data.total
+    page.value = table.data.page
+    pageSize.value = table.data.pageSize
+  }
+}
+
+getTableData()
+
+// ============== 表格控制部分结束 ===============
+
+// 获取需要的字典 可能为空 按需保留
+const setOptions = async () =>{
+}
+
+// 获取需要的字典 可能为空 按需保留
+setOptions()
+
+
+// 多选数据
+const multipleSelection = ref([])
+// 多选
+const handleSelectionChange = (val) => {
+    multipleSelection.value = val
+}
+
+// 删除行
+const deleteRow = (row) => {
+    ElMessageBox.confirm('确定要删除吗?', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+    }).then(() => {
+            deleteHrmLeaveOrOvertimeFunc(row)
+        })
+    }
+
+
+// 批量删除控制标记
+const deleteVisible = ref(false)
+
+// 多选删除
+const onDelete = async() => {
+      const ids = []
+      if (multipleSelection.value.length === 0) {
+        ElMessage({
+          type: 'warning',
+          message: '请选择要删除的数据'
+        })
+        return
+      }
+      multipleSelection.value &&
+        multipleSelection.value.map(item => {
+          ids.push(item.ID)
+        })
+      const res = await deleteHrmLeaveOrOvertimeByIds({ ids })
+      if (res.code === 0) {
+        ElMessage({
+          type: 'success',
+          message: '删除成功'
+        })
+        if (tableData.value.length === ids.length && page.value > 1) {
+          page.value--
+        }
+        deleteVisible.value = false
+        getTableData()
+      }
+    }
+
+// 行为控制标记（弹窗内部需要增还是改）
+const type = ref('')
+
+// 更新行
+const updateHrmLeaveOrOvertimeFunc = async(row) => {
+    const res = await findHrmLeaveOrOvertime({ ID: row.ID })
+    type.value = 'update'
+    if (res.code === 0) {
+        formData.value = res.data.rehrmLeaveOrOvertime
+        dialogFormVisible.value = true
+    }
+}
+
+
+// 删除行
+const deleteHrmLeaveOrOvertimeFunc = async (row) => {
+    const res = await deleteHrmLeaveOrOvertime({ ID: row.ID })
+    if (res.code === 0) {
+        ElMessage({
+                type: 'success',
+                message: '删除成功'
+            })
+            if (tableData.value.length === 1 && page.value > 1) {
+            page.value--
+        }
+        getTableData()
+    }
+}
+
+// 弹窗控制标记
+const dialogFormVisible = ref(false)
+
+// 打开弹窗
+const openDialog = () => {
+    type.value = 'create'
+    dialogFormVisible.value = true
+}
+
+// 关闭弹窗
+const closeDialog = () => {
+    dialogFormVisible.value = false
+    formData.value = {
+        user_id: 0,
+        is_leave: false,
+        start_date: new Date(),
+        end_date: new Date(),
+        is_approved: false,
+        explanation: '',
+        }
+}
+// 弹窗确定
+const enterDialog = async () => {
+     elFormRef.value?.validate( async (valid) => {
+             if (!valid) return
+              let res
+              switch (type.value) {
+                case 'create':
+                  res = await createHrmLeaveOrOvertime(formData.value)
+                  break
+                case 'update':
+                  res = await updateHrmLeaveOrOvertime(formData.value)
+                  break
+                default:
+                  res = await createHrmLeaveOrOvertime(formData.value)
+                  break
+              }
+              if (res.code === 0) {
+                ElMessage({
+                  type: 'success',
+                  message: '创建/更改成功'
+                })
+                closeDialog()
+                getTableData()
+              }
+      })
+}
+</script>
+
+<style>
+</style>
